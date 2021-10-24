@@ -1,0 +1,283 @@
+<!-- By Roger Rosenquist - 109372651 -->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Snake Game</title>
+  <link href="https://fonts.googleapis.com/css?family=Playfair+Display" rel="stylesheet">
+</head>
+
+<body>
+  <!-- Divs for each component -->
+  <div id="scoreRules"></div>
+  <div id="score">Current Score: 0</div>
+  <canvas id="snakeCanvas" width="720" height="420"></canvas>
+  <div id="credits">By Roger Rosenquist - 109372651</div>
+
+  <!-- Style Components -->
+  <style>
+    body {
+      background: lightcoral url("https://stonybrookathletics.com/images/logos/site/site.png") no-repeat fixed bottom;
+      background-size: 150px;
+    }
+
+    #snakeCanvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #scoreRules {
+      text-align: center;
+      font-size: 40px;
+      font-family: 'Playfair Display', serif;
+    }
+
+    #score {
+      text-align: center;
+      font-size: 40px;
+      font-family: 'Playfair Display', serif;
+    }
+
+    #scoreHeading {
+      text-align: center;
+      font-size: 40px;
+      font-family: 'Playfair Display', serif;
+    }
+
+    #credits {
+      position: absolute;
+      bottom: 10px;
+      font-size: 15px;
+      font-family: 'Playfair Display', serif;
+    }
+  </style>
+</body>
+
+<script>
+  // Constants for the game, for easy access
+  const GAME_SPEED = 250;
+  const CANVAS_BORDER_COLOR = 'black';
+  const CANVAS_BACKGROUND_COLOR = "white";
+  const SNAKE_COLOR = 'red';
+  const SNAKE_BORDER_COLOR = 'black';
+  const FOOD_COLOR = 'gray';
+  const FOOD_BORDER_COLOR = 'black';
+  const CLASS_COLOR = 'black';
+
+  // Array of classes to populate in food
+  const classes = new Array(101, 114, 160, 161, 214, 215, 216, 220, 300, 303, 306, 307, 310, 311, 312, 316, 320, 327, 334, 337, 351, 352, 354, 371, 373, 376, 380, 385, 416, 506, 512, 526, 527, 532, 540, 541, 544, 545, 548, 550, 555, 564, 566, 600, 645)
+  // Sort them randomly so they come off the Array randomly
+  classes.sort(function () { return 0.5 - Math.random(); })
+  // Append required score to win to HTML
+  document.getElementById('scoreRules').innerHTML = "Score " + classes.length + " To Win!";
+
+  // Put the snake in the middle at the start
+  let snake = [
+    { x: 360, y: 200 }
+  ]
+
+  // The user's score
+  let score = 0;
+  // Variable for direction changing, set to false at start
+  let directionChange = false;
+
+  // Food x-coordinate
+  // Food y-coordinate
+  let foodVx;
+  let foodVy;
+  // X speed, set to 0 at start since we want it to not move horizontally
+  // Y speed, set to -20 since we want it to go up at start
+  let vx = 0;
+  let vy = -20;
+
+  // Store the canvas element and give it 2d context
+  const snakeCanvas = document.getElementById("snakeCanvas");
+  const ctx = snakeCanvas.getContext("2d");
+
+  // Start the game and create some food for the snake
+  main();
+  createFood();
+
+  // Add in a listener to change direction when keys are pressed
+  document.addEventListener("keydown", changeDirection);
+
+  // MAIN FUNCTION FOR GAME 
+  function main() {
+    // If the game is over, ask if the player would like to play again
+    if (gameOver()) {
+      if (confirm("You lose! Would you like to play again?")) {
+        location.reload();
+      } else {
+        window.close();
+      }
+    }
+
+    // If the score is 45, we've gone through the whole list of classes
+    // The player wins, so ask if they would like to play again
+    if (score == classes.length) {
+      if (confirm("You win! Would you like to play again?")) {
+        location.reload();
+      } else {
+        window.close();
+      }
+    }
+
+    // Run a function every specified game speed
+    setTimeout(function loop() {
+      // Set directionChange to false at beginning of the loop to let the user change direction
+      directionChange = false;
+
+      drawCanvas();
+      drawFood();
+      moveSnake();
+      drawSnake();
+      // Call main again to continually update
+      main();
+    }, GAME_SPEED)
+  }
+
+  // Function to draw the canvas with specified colors
+  function drawCanvas() {
+    ctx.fillStyle = CANVAS_BACKGROUND_COLOR;
+    ctx.strokestyle = CANVAS_BORDER_COLOR;
+
+    // Draw a rectangle that covers the whole canvas
+    ctx.fillRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+    // Draw a border around said canvas
+    ctx.strokeRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+  }
+
+  // Function to draw food onto the canvas
+  function drawFood() {
+    ctx.fillStyle = FOOD_COLOR;
+    ctx.strokestyle = FOOD_BORDER_COLOR;
+    ctx.fillRect(foodVx, foodVy, 20, 20);
+    ctx.strokeRect(foodVx, foodVy, 20, 20);
+
+    // Position the text for each class inside the food
+    ctx.fillStyle = CLASS_COLOR;
+    let classText = classes[score];
+    ctx.font = "10px Helvetica";
+    ctx.fillText(classText, foodVx + 1, foodVy + 10);
+  }
+
+
+  // Function to move the snake 
+  // Move x based on x velocity and move y based on y velocity
+  function moveSnake() {
+    // Make the new head for the snake and unshift it to add it to the beginning of the body
+    const head = { x: snake[0].x + vx, y: snake[0].y + vy };
+    snake.unshift(head);
+
+    //Check if the snake has eaten food
+    const snakeEatFood = snake[0].x === foodVx && snake[0].y === foodVy;
+    if (snakeEatFood) {
+      // Increase the score and display it
+      score += 1;
+      document.getElementById('score').innerHTML = "Current Score: " + score;
+
+      // Make new food
+      createFood();
+    } else {
+      // Pop off the end of the snake body
+      snake.pop();
+    }
+  }
+
+  // Function that returns game over if the snake hits itself or the walls
+  function gameOver() {
+    // Keep in mind the snake can only hit itself when it becomes length 5
+    for (let i = 4; i < snake.length; i++) {
+      if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) return true
+    }
+
+    const hitLeftWall = snake[0].x < 0;
+    const hitRightWall = snake[0].x > snakeCanvas.width - 20;
+    const hitToptWall = snake[0].y < 0;
+    const hitBottomWall = snake[0].y > snakeCanvas.height - 20;
+
+    return hitLeftWall || hitRightWall || hitToptWall || hitBottomWall
+  }
+
+  // Function to randomly generate a number based around 20
+  function randomTen(min, max) {
+    return Math.round((Math.random() * (max - min) + min) / 20) * 20;
+  }
+
+  // Function to randomly put food on the canvas
+  function createFood() {
+    // Generate random numbers for the coordinates
+    // -20 to not put it on the border of the canvas
+    foodVx = randomTen(0, snakeCanvas.width - 20);
+    foodVy = randomTen(0, snakeCanvas.height - 20);
+
+    // Check to see if the food is on the snake, and if it is, place it elsewhere
+    snake.forEach(function isFoodOnSnake(part) {
+      const foodOnSnake = part.x == foodVx && part.y == foodVy;
+      if (foodOnSnake) createFood();
+    });
+  }
+
+  // Function to draw the snake on the canvas
+  function drawSnake() {
+    // Loop through the whole snake and draw it all
+    snake.forEach(drawSnakePart)
+  }
+
+  // Function to draw parts of the snake based on the coordinates of each part
+  function drawSnakePart(snakePart) {
+    // Set the color of the snake and its border
+    ctx.fillStyle = SNAKE_COLOR;
+    ctx.strokestyle = SNAKE_BORDER_COLOR;
+
+    // Draw the snake based on those colors
+    ctx.fillRect(snakePart.x, snakePart.y, 20, 20);
+    ctx.strokeRect(snakePart.x, snakePart.y, 20, 20);
+  }
+
+
+  // Function that changes the direction based on key input
+  // The direction can't be switched to go backwards
+  function changeDirection(event) {
+    const LEFT_KEY = 37;
+    const RIGHT_KEY = 39;
+    const UP_KEY = 38;
+    const DOWN_KEY = 40;
+    
+    // If the direction is already changing, get out of this function
+    if (directionChange) return;
+    // If the direction isn't changing, set it to true and change the direction 
+    directionChange = true;
+
+    const keyPressed = event.keyCode;
+    // Make sure directions are consistent with velocity 
+    const goingUp = vy === -20;
+    const goingDown = vy === 20;
+    const goingRight = vx === 20;
+    const goingLeft = vx === -20;
+
+    // Only let movement occur if it doesn't conflict with opposite direction
+    if (keyPressed === LEFT_KEY && !goingRight) {
+      vx = -20;
+      vy = 0;
+    }
+    if (keyPressed === UP_KEY && !goingDown) {
+      vx = 0;
+      vy = -20;
+    }
+    if (keyPressed === RIGHT_KEY && !goingLeft) {
+      vx = 20;
+      vy = 0;
+    }
+    if (keyPressed === DOWN_KEY && !goingUp) {
+      vx = 0;
+      vy = 20;
+    }
+  }
+
+</script>
+
+</html>
